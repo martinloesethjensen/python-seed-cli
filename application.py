@@ -1,4 +1,5 @@
 import fileinput
+import fnmatch
 import os
 import shlex
 import subprocess
@@ -21,12 +22,13 @@ def find_and_replace(find, replace, file_name):
 def find_replace_in_dir(directory, find, replace):
     for path, dirs, files in os.walk(os.path.abspath(directory)):
         for filename in files:
-            filepath = os.path.join(path, filename)
-            with open(filepath) as file:
-                file_text = file.read()
-            file_text = file_text.replace(find, replace)
-            with open(filepath, "w") as file:
-                file.write(file_text)
+            if filename.endswith(('.kt', '.xml', '.gradle')):
+                filepath = os.path.join(path, filename)
+                with open(filepath) as file:
+                    file_text = file.read()
+                file_text = file_text.replace(find, replace)
+                with open(filepath, "w") as file:
+                    file.write(file_text)
 
 
 # This generates the keystore without the keytool cli.
@@ -36,6 +38,7 @@ def generate_keystore():
     args = shlex.split(cmd)
     subprocess.Popen(args)
     os.chdir("..")
+    print("Will take some time to do this process, please wait a few minutes")
 
 
 def rename_package_dirs():
@@ -80,5 +83,7 @@ if __name__ == '__main__':
 
     alias = input("Alias for the keystore: ")
     password = input("Password for the keystore: ")
-    # rename_keystore_fields()
-    # generate_keystore()  # Should be run at the end
+    rename_keystore_fields()
+    generate_keystore()  # Should be run at the end
+
+    os.remove("application.py")
