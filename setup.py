@@ -1,5 +1,4 @@
 import fileinput
-import fnmatch
 import os
 import shlex
 import subprocess
@@ -11,6 +10,7 @@ KEYSTORE_PASSWORD = "KEYSTORE_PASSWORD"
 KEYSTORE_ALIAS = "KEYSTORE_ALIAS"
 SEED_PACKAGE_NAME = "dk.adaptmobile.android_seed"
 APP_JAVA_PATH = "/app/src/main/java"
+GITHUB_ORG = "adaptdk"
 
 
 def find_and_replace(find, replace, file_name):
@@ -71,12 +71,24 @@ def rename_keystore_fields():
     find_and_replace(find=password, replace=KEYSTORE_PASSWORD, file_name=root_module + APP_BUILD_GRADLE)
 
 
+def create_private_repo():
+    subprocess.run(["hub", "create", "--private", "adaptdk/{repo_name}".format(repo_name=root_module)])
+
+
+def change_remote_url():
+    subprocess.run(
+        ["git", "remote", "set-url", "origin",
+         "git@github.com:{org}/{repo_name}.git".format(org=GITHUB_ORG, repo_name=root_module)])
+    print(f'Changed remote origin url to: ')
+    subprocess.run(["git", "remote", "--verbose"])
+
+
 if __name__ == '__main__':
     root_module = input("Name root module: ")
     rename_root_module()
 
     app_name = input("What's the app name: ")
-    # rename_app_name()
+    rename_app_name()
 
     package_name = input("Enter new package name like -> dk.adaptmobile.android_seed: ")
     rename_package_dirs()
@@ -86,4 +98,8 @@ if __name__ == '__main__':
     rename_keystore_fields()
     generate_keystore()  # Should be run at the end
 
-    os.remove("application.py")
+    create_private_repo()
+
+    change_remote_url()
+
+    os.remove("setup.py")
