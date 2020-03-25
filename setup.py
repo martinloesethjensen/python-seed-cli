@@ -1,17 +1,76 @@
+import fileinput
 import os
 import shlex
+import shutil
 import subprocess
 
-from consts import \
-    APP_BUILD_GRADLE, \
-    APP_JAVA_PATH, \
-    APP_NAME_CHANGE, \
-    OLD_SEED_MODULE, \
-    SEED_PACKAGE_NAME, \
-    KEYSTORE_ALIAS, \
-    KEYSTORE_PASSWORD, \
-    GITHUB_ORG
-from helpers import find_replace_in_dir, find_and_replace, dynamic_folder_structure
+OLD_SEED_MODULE = "Android-Seed"
+APP_BUILD_GRADLE = "/app/build.gradle"
+APP_NAME_CHANGE = "APP_NAME_CHANGE"
+KEYSTORE_PASSWORD = "KEYSTORE_PASSWORD"
+KEYSTORE_ALIAS = "KEYSTORE_ALIAS"
+SEED_PACKAGE_NAME = "dk.adaptmobile.android_seed"
+APP_JAVA_PATH = "/app/src/main/java"
+GITHUB_ORG = "adaptdk"
+
+
+def find_and_replace(find, replace, file_name):
+    with fileinput.FileInput(file_name, inplace=True) as file:
+        for line in file:
+            print(line.replace(replace, find), end='')
+
+
+def find_replace_in_dir(directory, find, replace):
+    for path, dirs, files in os.walk(os.path.abspath(directory)):
+        for filename in files:
+            if filename.endswith(('.kt', '.xml', '.gradle')):
+                filepath = os.path.join(path, filename)
+                with open(filepath) as file:
+                    file_text = file.read()
+                file_text = file_text.replace(find, replace)
+                with open(filepath, "w") as file:
+                    file.write(file_text)
+
+
+def move_folder(source, destination, avoid_folders=()):
+    for _, dirs, files in os.walk(os.path.abspath(source)):
+        for avoid_folder in avoid_folders:
+            if avoid_folder in dirs:
+                dirs.remove(avoid_folder)
+        for _dir in dirs:
+            shutil.move('{0}/{1}'.format(source, _dir), destination)
+        for _file in files:
+            shutil.move('{0}/{1}'.format(source, _file), destination)
+
+
+def dynamic_folder_structure(seed_package_name_split, new_package_name_split):
+    old_package_count = len(seed_package_name_split)
+    new_package_count = len(new_package_name_split)
+
+    ranger = range(old_package_count) if old_package_count >= new_package_count else range(new_package_count)
+    count_condition = old_package_count if old_package_count <= new_package_count else new_package_count
+
+    avoid_folders = []
+    cwd = ""
+    folder = ""
+    for i in ranger:
+        if i < count_condition:
+            os.rename(seed_package_name_split[i], new_package_name_split[i])
+            os.chdir(new_package_name_split[i])
+            cwd = os.getcwd()
+            folder = cwd
+        elif i > old_package_count - 1:
+            avoid_folders.append(new_package_name_split[i])
+            folder += "/" + new_package_name_split[i]
+            os.mkdir(folder)
+            if i == new_package_count - 1:
+                move_folder(source=cwd, destination=folder, avoid_folders=avoid_folders)
+            else:
+                os.chdir(new_package_name_split[i])
+        else:
+            source = '{0}/{1}'.format(cwd, seed_package_name_split[i])
+            move_folder(source=source, destination=cwd)
+            os.rmdir(source)
 
 
 # This generates the keystore without the keytool cli.
@@ -26,15 +85,10 @@ def generate_keystore():
 
 def rename_package_dirs():
     os.chdir(project_module + APP_JAVA_PATH)
-
     dynamic_folder_structure(SEED_PACKAGE_NAME.split("."), package_name.split("."))
-
-    print("Current working directory: " + os.getcwd())
     os.chdir(project_module_path)
-    print("Changed directory to: " + os.getcwd())
     find_replace_in_dir(os.getcwd(), SEED_PACKAGE_NAME, package_name)
     os.chdir('..')
-    print("Changed directory to: " + os.getcwd())
 
 
 def rename_app_name():
@@ -64,6 +118,19 @@ def change_remote_url():
     subprocess.run(["git", "remote", "--verbose"])
 
 
+def initial_commit(commit_message):
+    subprocess.run(["git", "add", "--all"])
+    subprocess.run(["git", "commit", "-m", "Initial commit"])  # TODO: could be user commit message
+    subprocess.run(["git", "push", "-u", "origin", "master"])
+
+
+def setup_branch(branch):
+    subprocess.run(["git", "checkout", "-b", branch])
+    print(f'Changed branch to: ')
+    subprocess.run(["git", "branch"])
+    subprocess.run(["git", "push", "--set-upstream", "origin", branch])
+
+
 if __name__ == '__main__':
     project_module = input("Name project module: ")
     rename_project_module()
@@ -86,5 +153,7 @@ if __name__ == '__main__':
     change_remote_url()
 
     os.remove("setup.py")
-    os.remove("consts.py")
-    os.remove("helpers.py")
+
+    initial_commit("Initial commit")
+    setup_branch("stage")
+    setup_branch("develop")
