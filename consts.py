@@ -1,0 +1,8 @@
+OLD_SEED_MODULE = "Android-Seed"
+APP_BUILD_GRADLE = "/app/build.gradle"
+APP_NAME_CHANGE = "APP_NAME_CHANGE"
+KEYSTORE_PASSWORD = "KEYSTORE_PASSWORD"
+KEYSTORE_ALIAS = "KEYSTORE_ALIAS"
+SEED_PACKAGE_NAME = "dk.adaptmobile.android_seed"
+APP_JAVA_PATH = "/app/src/main/java"
+GITHUB_ORG = "adaptdk"

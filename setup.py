@@ -1,35 +1,17 @@
-import subprocess
-
-import fileinput
 import os
 import shlex
+import subprocess
 
-OLD_SEED_MODULE = "Android-Seed"
-APP_BUILD_GRADLE = "/app/build.gradle"
-APP_NAME_CHANGE = "APP_NAME_CHANGE"
-KEYSTORE_PASSWORD = "KEYSTORE_PASSWORD"
-KEYSTORE_ALIAS = "KEYSTORE_ALIAS"
-SEED_PACKAGE_NAME = "dk.adaptmobile.android_seed"
-APP_JAVA_PATH = "/app/src/main/java"
-GITHUB_ORG = "adaptdk"
-
-
-def find_and_replace(find, replace, file_name):
-    with fileinput.FileInput(file_name, inplace=True) as file:
-        for line in file:
-            print(line.replace(replace, find), end='')
-
-
-def find_replace_in_dir(directory, find, replace):
-    for path, dirs, files in os.walk(os.path.abspath(directory)):
-        for filename in files:
-            if filename.endswith(('.kt', '.xml', '.gradle')):
-                filepath = os.path.join(path, filename)
-                with open(filepath) as file:
-                    file_text = file.read()
-                file_text = file_text.replace(find, replace)
-                with open(filepath, "w") as file:
-                    file.write(file_text)
+from consts import \
+    APP_BUILD_GRADLE, \
+    APP_JAVA_PATH, \
+    APP_NAME_CHANGE, \
+    OLD_SEED_MODULE, \
+    SEED_PACKAGE_NAME, \
+    KEYSTORE_ALIAS, \
+    KEYSTORE_PASSWORD, \
+    GITHUB_ORG
+from helpers import find_replace_in_dir, find_and_replace, dynamic_folder_structure
 
 
 # This generates the keystore without the keytool cli.
@@ -45,13 +27,7 @@ def generate_keystore():
 def rename_package_dirs():
     os.chdir(project_module + APP_JAVA_PATH)
 
-    seed_package_name_split = SEED_PACKAGE_NAME.split(".")
-    new_package_name_split = package_name.split(".")
-
-    # TODO: Make dynamic so you can have x count of folders ect: 'dk.dkt'
-    for i in range(len(seed_package_name_split)):
-        os.rename(seed_package_name_split[i], new_package_name_split[i])
-        os.chdir(new_package_name_split[i])
+    dynamic_folder_structure(SEED_PACKAGE_NAME.split("."), package_name.split("."))
 
     print("Current working directory: " + os.getcwd())
     os.chdir(project_module_path)
@@ -110,3 +86,5 @@ if __name__ == '__main__':
     change_remote_url()
 
     os.remove("setup.py")
+    os.remove("consts.py")
+    os.remove("helpers.py")
