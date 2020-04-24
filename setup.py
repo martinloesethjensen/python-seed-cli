@@ -3,6 +3,7 @@ import os
 import shlex
 import shutil
 import subprocess
+from pathlib import Path
 
 OLD_SEED_MODULE = "Android-Seed"
 APP_BUILD_GRADLE = "/app/build.gradle"
@@ -10,8 +11,11 @@ APP_NAME_CHANGE = "APP_NAME_CHANGE"
 KEYSTORE_PASSWORD = "KEYSTORE_PASSWORD"
 KEYSTORE_ALIAS = "KEYSTORE_ALIAS"
 SEED_PACKAGE_NAME = "dk.adaptmobile.android_seed"
-APP_JAVA_PATH = "/app/src/main/java"
+APP_SRC_PATH = "/app/src/main/java"
 GITHUB_ORG = "adaptdk"
+BITRISE_PROJECT_LOCATION_PLACEHOLDER = "SEED_PROJECT_NAME"
+BITRISE_YAML_FILE = "bitrise.yml"
+BITRISE_ORG = "org id"
 
 
 def find_and_replace(find, replace, file_name):
@@ -76,15 +80,15 @@ def dynamic_folder_structure(seed_package_name_split, new_package_name_split):
 # This generates the keystore without the keytool cli.
 def generate_keystore():
     os.chdir("launch")
-    cmd = f'keytool -genkey -v -keystore release.keystore -keyalg RSA -keysize 16384 -validity 10000 -alias {alias} -dname "cn=Unknown, ou=Unknown, o=Unknown, c=Unknown" -storepass {password} -keypass {password}'
+    cmd = f'keytool -genkey -v -keystore release.keystore -keyalg RSA -keysize 4096 -validity 10000 -alias {alias} -dname "cn=Unknown, ou=Unknown, o=Unknown, c=Unknown" -storepass {password} -keypass {password}'
     args = shlex.split(cmd)
     subprocess.Popen(args)
     os.chdir("..")
-    print("Will take some time to do this process, please wait a few minutes")
+    print("Will take some time to do this process, please wait for a while...")
 
 
 def rename_package_dirs():
-    os.chdir(project_module + APP_JAVA_PATH)
+    os.chdir(project_module + APP_SRC_PATH)
     dynamic_folder_structure(SEED_PACKAGE_NAME.split("."), package_name.split("."))
     os.chdir(project_module_path)
     find_replace_in_dir(os.getcwd(), SEED_PACKAGE_NAME, package_name)
@@ -107,7 +111,7 @@ def rename_keystore_fields():
 
 
 def create_private_repo():
-    subprocess.run(["hub", "create", "--private", "adaptdk/{repo_name}".format(repo_name=project_module)])
+    subprocess.run(["hub", "create", "--private", "{org}/{repo_name}".format(org=GITHUB_ORG, repo_name=project_module)])
 
 
 def change_remote_url():
@@ -118,9 +122,9 @@ def change_remote_url():
     subprocess.run(["git", "remote", "--verbose"])
 
 
-def initial_commit(commit_message):
+def initial_commit():
     subprocess.run(["git", "add", "--all"])
-    subprocess.run(["git", "commit", "-m", "Initial commit"])  # TODO: could be user commit message
+    subprocess.run(["git", "commit", "-m", "Initial commit"])  # TODO: Could take on a commit message 🤔
     subprocess.run(["git", "push", "-u", "origin", "master"])
 
 
@@ -131,9 +135,43 @@ def setup_branch(branch):
     subprocess.run(["git", "push", "--set-upstream", "origin", branch])
 
 
+def rename_bitrise_project_location_placeholder():
+    find_and_replace(find=project_module, replace=BITRISE_PROJECT_LOCATION_PLACEHOLDER, file_name=BITRISE_YAML_FILE)
+    print(f'Changed Bitrise PROJECT_LOCATION to: {project_module}')
+
+
+def read_bitrise_token() -> str:
+    home = str(Path.home())
+    filename = f'{home}/.am_seed_token'
+    mode = "r" if os.path.isfile(filename) and os.path.getsize(filename) else "w"
+
+    with open(filename, mode) as file:
+        filesize = os.path.getsize(filename)
+
+        # Save token from input into the created file
+        if filesize == 0 or mode == "w":
+            bitrise_token = input("Enter Bitrise api token: ")
+            file.write(f'{bitrise_token}')
+        else:
+            # Read token from existing file that is not empty
+            bitrise_token = file.read()
+
+        file.close()
+
+        return bitrise_token
+
+
+def setup_bitrise():
+    cmd = f'bash -c "bash <(curl -sfL "https://raw.githubusercontent.com/bitrise-io/bitrise-add-new-project/master/_scripts/run.sh") --api-token "{bitrise_api_token}" --org "{BITRISE_ORG}" --public "false" --website"'
+    args = shlex.split(cmd)
+    subprocess.run(args)
+
+
 if __name__ == '__main__':
-    project_module = input("Name project module: ")
+    project_module = input("Name project module: ").replace(" ", "-")
     rename_project_module()
+
+    rename_bitrise_project_location_placeholder()
 
     project_module_path = "{0}/{1}".format(os.getcwd(), project_module)
 
@@ -154,6 +192,10 @@ if __name__ == '__main__':
 
     os.remove("setup.py")
 
-    initial_commit("Initial commit")
+    initial_commit()
     setup_branch("stage")
     setup_branch("develop")
+
+    bitrise_api_token = read_bitrise_token()
+
+    setup_bitrise()
